@@ -1,9 +1,8 @@
 import dataclasses
-from typing import Optional, Dict, Any, List
+import logging
+from typing import Dict, List
 
 import psycopg2
-from psycopg2.extras import RealDictCursor
-import logging
 
 LOGGER = logging.getLogger("db.user")
 
@@ -12,6 +11,7 @@ LOGGER = logging.getLogger("db.user")
 class Users:
     id: str
     enabled: bool
+    lang: str
 
 
 class UsersManager:
@@ -31,7 +31,8 @@ class UsersManager:
                 CREATE TABLE IF NOT EXISTS Users
                 (
                     id      text NOT NULL PRIMARY KEY,
-                    enabled boolean NOT NULL DEFAULT FALSE
+                    enabled boolean NOT NULL DEFAULT FALSE,
+                    lang  text NOT NULL DEFAULT 'en'
                 );
             """)
         except psycopg2.Error as e:
@@ -78,16 +79,30 @@ class UsersManager:
             self.conn.rollback()
             raise Exception(f"Error updating question: {e}")
 
-
-    def get_enabled_users(self) -> List[str]:
+    def get_enabled_users(self) -> Dict[str, List[str]]:
         """Return a list of enabled users."""
         try:
             with self.conn.cursor() as cur:
-                query = "SELECT id FROM Users WHERE enabled = TRUE"
+                query = "SELECT id, lang FROM Users WHERE enabled = TRUE"
                 cur.execute(query)
                 result = cur.fetchall()
-                return [x for x, in result]
+                users = {}
+
+                for user_id, lang in result:
+                    users.get(lang, []).append(user_id)
+
+                return users
 
         except psycopg2.Error as e:
             raise Exception(f"Error getting enabled users: {e}")
 
+    def get_all_users(self) -> List[str]:
+        """Return a list of all users."""
+        try:
+            with self.conn.cursor() as cur:
+                query = "SELECT id FROM Users"
+                cur.execute(query)
+                result = cur.fetchall()
+                return [x for x, in result]
+        except psycopg2.Error as e:
+            raise Exception(f"Error getting all users: {e}")
